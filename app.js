@@ -1,20 +1,20 @@
 const Koa = require('./src/application')
 
 const app = new Koa()
-app.use((crx, next) => {
+app.use((ctx, next) => {
     console.log(1)
     next()
     console.log(2)
 })
-app.use((crx, next) => {
+app.use((ctx, next) => {
     console.log(3)
     next()
     console.log(4)
 })
-app.use((crx, next) => {
+app.use((ctx, next) => {
     console.log(5)
     next()
-    console.log(6)
+    ctx.body = "11"
 })
 
 app.listen('3306', (err)=>{

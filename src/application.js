@@ -19,12 +19,12 @@ class Koa extends EventEmitter {
     compose(middlewares, ctx) {
         function dispatch(index) {
             if(index === middlewares.length) {
-                return
+                return Promise.resolve
             }
             let middleware = middlewares[index]
-            middleware(ctx, ()=> dispatch(index+1)) //递归处理中间件 调用next时，会执行下一个中间件
+            return Promise.resolve(middleware(ctx, () => dispatch(index+1)))//递归处理中间件 调用next时，会执行下一个中间件
         }
-        dispatch(0)
+        return dispatch(0)
     }
     createContext(req, res) {
         const ctx = Object.create(this.context)
@@ -43,19 +43,26 @@ class Koa extends EventEmitter {
         res.statusCode = 404 //默认404
         let ctx = this.createContext(req, res)
         // this.fn(ctx)
-        this.compose(this.middlewares, ctx)
-        //ctx.body输出到前台的数据
-        if(typeof ctx.body === 'object') {
-            res.setHeader('Content-Type', 'application/json;charset=utf8')
-            res.end(JSON.stringify(ctx.body))
-        } else if(ctx.body instanceof Stream) { // 流输入时
-            ctx.body.pipe(res)
-        } else if(typeof ctx.body === 'string' || Buffer.isBuffer(ctx.body)) { // 
-            res.setHeader('Content-Type', 'text/htmlcharset=utf8')
-            res.end(ctx.body)
-        } else {
-            res.end('not found') 
-        }
+        const fn = this.compose(this.middlewares, ctx)
+        fn.then(function() {
+            //ctx.body输出到前台的数据
+            if(typeof ctx.body === 'object') {
+                res.setHeader('Content-Type', 'application/json;charset=utf8')
+                res.end(JSON.stringify(ctx.body))
+            } else if(ctx.body instanceof Stream) { // 流输入时
+                ctx.body.pipe(res)
+            } else if(typeof ctx.body === 'string' || Buffer.isBuffer(ctx.body)) { // 
+                res.setHeader('Content-Type', 'text/htmlcharset=utf8')
+                res.end(ctx.body)
+            } else {
+                res.end('not found') 
+            }
+        }).catch(function(err) {
+            this.emit('error', err)
+            res.statusCode = 500
+            res.end('server error')
+        })
+        
     }
     listen() {
         let server = http.createServer(this.handleRequest.bind(this))
